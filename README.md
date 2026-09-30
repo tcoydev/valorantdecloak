@@ -108,6 +108,21 @@ it by hand or run `python main.py --config` for the interactive menu.
 Free Henrik API keys are limited to roughly 30 requests per minute. Successful
 lookups are cached for an hour and failed ones are retried after 30 seconds.
 
+## Developing the panel
+
+The panel UI is a React + Tailwind + [shadcn/ui](https://ui.shadcn.com) app whose
+source lives in `panel-src/`. `web/` only holds the compiled output that the
+Python server serves, so end users need no Node.js.
+
+```bash
+cd panel-src
+npm install
+npm run dev      # hot reload; /data, /info, /quit, /lang are proxied to localhost:1100
+npm run build    # compiles into ../web (commit the result)
+```
+
+Add new shadcn components with `npx shadcn@latest add <name>`.
+
 ## What about that Tweet?
 
 The [Tweet](https://twitter.com/PlayVALORANT/status/1539728676815642624), which details Riot's API policies

@@ -29,3 +29,7 @@ tracker_cache.json
 # OS
 Thumbs.db
 .DS_Store
+
+# Panel kaynak (Vite) bağımlılıkları
+panel-src/node_modules/
+panel-src/*.tsbuildinfo
