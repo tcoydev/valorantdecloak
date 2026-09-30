@@ -24,7 +24,6 @@ def configure():
 
     menu_choices = [
         "Weapon Selection",
-        "Table Customization",
         "Optional Feature Flags",
         Separator(),
         "Full Basic Config (Suitable for most users)",
@@ -47,14 +46,12 @@ def configure():
         if choice is menu_choices[0]:
             changed_config |= prompt([weapon_question(config=loop_config)])
         elif choice is menu_choices[1]:
-            changed_config |= prompt([table_question(config=loop_config)])
-        elif choice is menu_choices[2]:
             changed_config |= prompt([flags_question(config=loop_config)])
-        elif choice is menu_choices[4]:
+        elif choice is menu_choices[3]:
             changed_config |= prompt(basic_questions(config=loop_config))
-        elif choice is menu_choices[5]:
+        elif choice is menu_choices[4]:
             changed_config |= prompt(advance_questions(config=loop_config))
-        elif choice is menu_choices[7]:
+        elif choice is menu_choices[6]:
             proceed=True
             break
         else:

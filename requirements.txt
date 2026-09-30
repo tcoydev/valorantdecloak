@@ -2,14 +2,12 @@ certifi==2024.7.4
 cffi==2.0.0
 charset-normalizer==3.2.0
 Colr==0.9.1
-curl_cffi==0.16.0
 customtkinter==5.2.2
 InquirerPy==0.3.4
 markdown-it-py==3.0.0
 mdurl==0.1.2
 nest-asyncio==1.5.6
 pfzy==0.3.4
-primp==2.0.0
 prompt-toolkit==3.0.36
 Pygments==2.15.1
 pywebview==5.4

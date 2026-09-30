@@ -10,7 +10,7 @@ build_exe_options = {
         ('assets/Logo.ico', 'assets/Logo.ico'),  # kontrol penceresinin görev çubuğu simgesi
     ],
     "packages": [
-        "requests", "primp", "curl_cffi", "colr", "InquirerPy", "websockets", "pypresence",
+        "requests", "colr", "InquirerPy", "websockets", "pypresence",
         "nest_asyncio", "rich", "websocket_server",
         # Paneli ayrı tarayıcı yerine gömülü native pencerede açmak için
         # (src/panel_window.py). Windows backend'i EdgeChromium/WebView2 olup

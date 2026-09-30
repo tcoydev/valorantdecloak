@@ -14,6 +14,7 @@ entirely locally, and the interface is in Turkish.
     <li><a href="#about-the-project">About The Project</a></li>
     <li><a href="#features">Features</a></li>
     <li><a href="#usage">Usage</a></li>
+    <li><a href="#configuration">Configuration</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgements">Acknowledgements</a></li>
@@ -23,8 +24,9 @@ entirely locally, and the interface is in Turkish.
 
 ## About The Project
 
-The panel shows every player's rank, peak rank, K/D, headshot %, level, and party
-grouping at a glance:
+The panel shows every player's rank, RR, peak rank, K/D, headshot %, level, and
+party grouping at a glance. K/D and HS % are calculated from each player's last
+5 competitive matches:
 
 ![Screenshot](assets/Example.png)
 
@@ -40,15 +42,26 @@ Clicking "Skins" on a player opens their in-match loadout:
   Closing the panel window closes the program as well. If pywebview isn't
   available, the panel automatically falls back to your default browser.
 - **Hidden name resolution (decloak)**: Real nicknames of streamer-mode/hidden
-  players are resolved first via the Henrik API, then via vtl.lol as a
-  fallback; if both fail, a `Gizli (xxxxxxxx)` placeholder is shown instead.
+  players are resolved via the Henrik API (set `henrikdev_api_key` in
+  `config.json`); if that fails, a plain `Gizli` label is shown, and clicking it
+  copies the player's PUUID.
+- **Account level**: The level Riot reports is used as-is. Only when Riot hides
+  it (it comes back as `0`, empty, or `N/A`) is the level looked up through the
+  Henrik API, so no extra requests are made for players whose level is visible.
+  Without an API key, hidden levels are simply not shown.
+- **Last 5 competitive matches**: K/D and HS % are calculated from Riot's own
+  match history and are shown only once they are actually loaded. Players with
+  no competitive matches (or when Riot returns an error) show no K/D/HS at all.
+- **Loads in the background**: The panel opens immediately with names, ranks, and
+  peak ranks; slower data (stats, hidden names, levels) is filled in as it
+  arrives. Rank and agent icons are retried automatically and cached in your
+  browser, so a slow `valorant-api.com` does not leave them blank.
 - **No license/HWID check**: The program runs entirely locally without
   connecting to any license server.
 - **Turkish interface**: All messages and game modes shown in the panel are in
-  Turkish.
-- Shows rank, peak rank, RR, headshot percentage, win rate, leaderboard
-  position, account level, current skin, and Discord Rich Presence, among
-  other stats.
+  Turkish (an English option is available from the language switch).
+- Also shows the current skin loadout (per player, in-game), party/premade
+  grouping, and Discord Rich Presence.
 
 
 ## Usage
@@ -77,6 +90,23 @@ You can also run `python main.py --config` to open the interactive settings menu
 2) `python setup.py build`
 3) Open the new Build folder and find `Decloak.exe`.
 
+
+## Configuration
+
+Settings live in `config.json` (created with defaults on first run). You can edit
+it by hand or run `python main.py --config` for the interactive menu.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `henrikdev_api_key` | `""` | [HenrikDEV API key](https://api.henrikdev.xyz/dashboard/api-keys/). Needed to resolve hidden names and hidden levels. `YOUR_APIKEY` is treated as "no key". |
+| `port` | `1100` | Port of the local web panel. |
+| `weapon` | `"Vandal"` | Weapon whose skin is shown for each player. |
+| `cooldown` | `10` | Legacy setting; only `0` has an effect (waits for Enter between refreshes when a console is attached). |
+| `flags.peak_rank_act` | `true` | Show the act the peak rank was reached in (e.g. `e5a2`) next to the peak rank icon. |
+| `flags.discord_rpc` | `true` | Enable Discord Rich Presence. |
+
+Free Henrik API keys are limited to roughly 30 requests per minute. Successful
+lookups are cached for an hour and failed ones are retried after 30 seconds.
 
 ## What about that Tweet?
 

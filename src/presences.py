@@ -58,11 +58,18 @@ class Presences:
             "partyVersion": 0,
         }
 
-    def wait_for_presence(self, PlayersPuuids):
+    def wait_for_presence(self, PlayersPuuids, timeout=1.5, interval=0.25):
+        """Tüm oyuncuların presence'ı görünene kadar en fazla `timeout` sn bekler.
+
+        Eski sürüm presence'ı bir kez çekip eksik oyuncu başına 1 sn uyuyordu
+        (10 kişide ~10 sn, üstelik veri yenilenmeden). Şimdi her turda presence
+        yeniden çekilir, hepsi geldiyse hemen döner, gelmediyse süre sınırında
+        vazgeçer; eksik presence sadece premade/parti tespitini etkiler."""
+        deadline = time.monotonic() + timeout
         while True:
-            presence = self.get_presence()
-            for puuid in PlayersPuuids:
-                if puuid not in str(presence):
-                    time.sleep(1)
-                    continue
-            break
+            presence = str(self.get_presence())
+            if all(puuid in presence for puuid in PlayersPuuids):
+                return True
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(interval)

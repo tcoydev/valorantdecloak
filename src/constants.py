@@ -193,33 +193,9 @@ DEFAULT_CONFIG = {
     "cooldown": 10,
     "port": 1100,
     "weapon": "Vandal",
-    "chat_limit": 5,
-    "stats_match_count": 10,
     "henrikdev_api_key": "",
-    "table": {
-        "skin": True,
-        "rr": True,
-        "earned_rr": True,
-        "peakrank": True,
-        "previousrank": False,
-        "leaderboard": True,
-        "headshot_percent": True,
-        "winrate": True,
-        "kd": False,
-        "level": True
-    },
     "flags": {
-        "gui": True,
-        "last_played": True,
-        "auto_hide_leaderboard": True,
-        "pre_cls": False,
-        "game_chat": True,
         "peak_rank_act": True,
         "discord_rpc": True,
-        "aggregate_rank_rr": True,
-        "server_id": False,
-        "short_ranks": False,
-        "truncate_skins": True,
-        "truncate_names": True,
     }
 }

@@ -219,6 +219,7 @@ a { color: inherit; }
 }
 .team-card.blue .team-title { color: var(--blue); }
 .team-card.red  .team-title { color: var(--red); }
+.team-note { margin-right: 12px; opacity: .7; text-transform: none; letter-spacing: 0; }
 .team-count {
   color: var(--muted); font-size: 12px; font-weight: 600;
   text-transform: uppercase; letter-spacing: .5px;

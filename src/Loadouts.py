@@ -1,3 +1,4 @@
+import threading
 import time
 import requests
 from colr import color
@@ -13,17 +14,31 @@ class Loadouts:
         self.colors = colors
         self.Server = Server
         self.current_map = current_map
+        self._valApiCache = {}
+        self._valApiLock = threading.Lock()
+
+    VAL_API_ENDPOINTS = ("weapons", "buddies", "sprays", "agents", "playertitles", "playercards")
+
+    def prewarm_val_api(self):
+        """Statik valorant-api.com verilerini arka planda indirir; ilk maçta
+        panel bu 6 büyük JSON'u beklemesin diye program açılışında çağrılır."""
+        def _run():
+            for endpoint in self.VAL_API_ENDPOINTS:
+                try:
+                    self._get_val_api_data(endpoint)
+                except Exception as e:
+                    self.log(f"valorant-api onbellek isinmasi hatasi ({endpoint}): {e}")
+        threading.Thread(target=_run, daemon=True).start()
 
     def _get_val_api_data(self, endpoint):
         """valorant-api.com'dan gelen statik verileri (silah, sus esyasi, sprey,
         ajan, unvan, oyuncu karti) bu ornegin omru boyunca onbellege alir. Bu
         veriler VALORANT surumu degismedikce sabittir."""
-        if not hasattr(self, "_valApiCache"):
-            self._valApiCache = {}
-        if endpoint not in self._valApiCache:
-            self._valApiCache[endpoint] = requests.get(
-                f"https://valorant-api.com/v1/{endpoint}", timeout=10)
-        return self._valApiCache[endpoint]
+        with self._valApiLock:
+            if endpoint not in self._valApiCache:
+                self._valApiCache[endpoint] = requests.get(
+                    f"https://valorant-api.com/v1/{endpoint}", timeout=10)
+            return self._valApiCache[endpoint]
 
     def get_self_loadout(self):
         """Fetch the current player's own loadout (available in menus too) and

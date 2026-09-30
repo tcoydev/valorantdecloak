@@ -12,9 +12,9 @@ const I18N = {
     disconnected: "Bağlantı kesildi...",
     connectionError: "Bağlantı hatası, yeniden deneniyor...",
     players: "oyuncu",
+    statsNote: "K/D · HS: son 5 dereceli maç",
     playersTitle: "Oyuncular",
     copied: "Kopyalandı: ",
-    hidden: "Gizli",
     close: "Kapat",
     skins: "Skinler",
     weaponSkins: "Silah Skinleri",
@@ -79,9 +79,9 @@ const I18N = {
     disconnected: "Disconnected...",
     connectionError: "Connection error, retrying...",
     players: "players",
+    statsNote: "K/D · HS: last 5 competitive matches",
     playersTitle: "Players",
     copied: "Copied: ",
-    hidden: "Hidden",
     close: "Close",
     skins: "Skins",
     weaponSkins: "Weapon Skins",
@@ -139,12 +139,13 @@ const I18N = {
   },
 };
 
+// Sunucunun çözülemeyen gizli oyuncular için gönderdiği isim (src/names.py HIDDEN_NAME).
+const HIDDEN_NAME = "Gizli";
+
 let LANG = localStorage.getItem("vd_lang") || "tr";
 if (!I18N[LANG]) LANG = "tr";
 const T = () => I18N[LANG];
 
-// Sunucudan gelen ham veri "Gizli" olarak gelir; dile göre çevir.
-function localizeHidden(v) { return v === "Gizli" ? T().hidden : v; }
 
 // Takım kategorileri (silahlar dilden bağımsız aynı kalır; başlık çevrilir).
 const WEAPON_GROUPS = [
@@ -176,21 +177,76 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-async function loadAssets() {
-  // Bu iki istek dış siteye (valorant-api.com) gidiyor; panel bu isteklere
-  // ulaşamazsa/yavaş kalırsa bile /data poll'u ASLA bloklanmamalı, o yüzden
-  // her birine ayrı bir zaman aşımı var (AbortSignal.timeout).
+// Ajan/rank ikon adresleri valorant-api.com'dan gelir. İstek başarısız olursa
+// başarılı olana kadar artan aralıkla tekrar denenir; başarılı sonuç
+// localStorage'a yazılır, böylece sonraki açılışta ikonlar anında görünür.
+const ASSET_CACHE_KEY = "vd_assets_v1";
+
+function loadAssetCache() {
   try {
-    const j = await (await fetch("https://valorant-api.com/v1/agents?isPlayableCharacter=true", { signal: AbortSignal.timeout(8000) })).json();
-    j.data.forEach((a) => { AGENTS[a.displayName] = a.displayIcon; });
-  } catch (e) {}
-  try {
-    const j = await (await fetch("https://valorant-api.com/v1/competitivetiers", { signal: AbortSignal.timeout(8000) })).json();
-    j.data[j.data.length - 1].tiers.forEach((t) => {
-      TIERS[t.tier] = { color: "#" + (t.color ? t.color.slice(0, 6) : "8a909c"), icon: t.smallIcon };
-    });
+    const c = JSON.parse(localStorage.getItem(ASSET_CACHE_KEY) || "{}");
+    if (c.agents) AGENTS = c.agents;
+    if (c.tiers) TIERS = c.tiers;
   } catch (e) {}
 }
+function saveAssetCache() {
+  try { localStorage.setItem(ASSET_CACHE_KEY, JSON.stringify({ agents: AGENTS, tiers: TIERS })); } catch (e) {}
+}
+function rerenderLatest() {
+  if (_hasData) render(LATEST);
+}
+
+// fn başarılı olana kadar (2s, 4s, 8s ... en çok 30s aralıkla) tekrar dener.
+async function retryUntilOk(fn) {
+  for (let delay = 2000; ; delay = Math.min(delay * 2, 30000)) {
+    try { await fn(); return; } catch (e) {}
+    await new Promise((r) => setTimeout(r, delay));
+  }
+}
+
+async function loadAssets() {
+  // Bu istekler dış siteye gidiyor; /data poll'unu ASLA bloklamamalı, o yüzden
+  // her biri ayrı zaman aşımıyla ve birbirinden bağımsız çalışır.
+  const agents = retryUntilOk(async () => {
+    const j = await (await fetch("https://valorant-api.com/v1/agents?isPlayableCharacter=true", { signal: AbortSignal.timeout(8000) })).json();
+    const next = {};
+    j.data.forEach((a) => { next[a.displayName] = a.displayIcon; });
+    if (!Object.keys(next).length) throw new Error("boş ajan listesi");
+    AGENTS = next;
+    saveAssetCache();
+    rerenderLatest();
+  });
+  const tiers = retryUntilOk(async () => {
+    const j = await (await fetch("https://valorant-api.com/v1/competitivetiers", { signal: AbortSignal.timeout(8000) })).json();
+    const next = {};
+    j.data[j.data.length - 1].tiers.forEach((t) => {
+      next[t.tier] = { color: "#" + (t.color ? t.color.slice(0, 6) : "8a909c"), icon: t.smallIcon };
+    });
+    if (!Object.keys(next).length) throw new Error("boş rank listesi");
+    TIERS = next;
+    saveAssetCache();
+    rerenderLatest();
+  });
+  await Promise.all([agents, tiers]);
+}
+
+// Yüklenemeyen valorant-api görselleri (rank, ajan, kart, skin) 3 kereye kadar
+// artan gecikmeyle yeniden denenir; geçici ağ hatasında ikon kalıcı kaybolmaz.
+document.addEventListener("error", (e) => {
+  const img = e.target;
+  if (!img || img.tagName !== "IMG") return;
+  const orig = img.dataset.orig || img.src;
+  if (!/^https:\/\/(media\.)?valorant-api\.com\//.test(orig)) return;
+  img.dataset.orig = orig;
+  const n = (parseInt(img.dataset.retry, 10) || 0) + 1;
+  if (n > 3) return;
+  img.dataset.retry = String(n);
+  setTimeout(() => {
+    if (!img.isConnected) return;
+    img.style.display = "";
+    img.src = orig + (orig.includes("?") ? "&" : "?") + "r=" + n;
+  }, 1500 * n);
+}, true);
 
 function rankInfo(idx) {
   const t = TIERS[idx];
@@ -221,9 +277,9 @@ function copyText(text) {
   }
 }
 
-function chip(value, label, cls) {
+function chip(value, label, cls, title) {
   if (value == null || value === "") return "";
-  return `<div class="chip"><span class="v ${cls || ""}">${esc(value)}</span><span class="l">${esc(label)}</span></div>`;
+  return `<div class="chip"${title ? ` title="${esc(title)}"` : ""}><span class="v ${cls || ""}">${esc(value)}</span><span class="l">${esc(label)}</span></div>`;
 }
 
 // Peak rank tile: rank icon on top, peak RR below (no rank name).
@@ -283,16 +339,15 @@ function playerRowHTML(puuid, p, isSelf) {
     rrHtml = `<span class="rr ${cls}">${sign}${n} RR</span>`;
   }
 
-  const kdRaw = p.kd != null ? String(p.kd) : null;
-  const kdNum = parseFloat(kdRaw);
+  // Sadece gerçek sayılar gösterilir: "-" (competitive maçı yok) ve "N/A" (hata) gizlenir.
+  const kdNum = parseFloat(p.kd);
+  const kdRaw = isNaN(kdNum) ? null : String(p.kd);
   const kdCls = isNaN(kdNum) ? "" : (kdNum >= 1 ? "good" : "bad");
-  const hsValRaw = p.headshotPercentage;
-  const hsRaw = (hsValRaw == null || hsValRaw === "") ? null
-    : (isNaN(parseFloat(hsValRaw)) ? String(hsValRaw) : parseFloat(hsValRaw) + "%");
-  const lvl = p.level != null ? p.level : null;
-  const bothHidden = kdRaw === "Gizli" && hsRaw === "Gizli";
-  const kd = localizeHidden(kdRaw);
-  const hs = localizeHidden(hsRaw);
+  const hsNum = parseFloat(p.headshotPercentage);
+  const hsRaw = isNaN(hsNum) ? null : hsNum + "%";
+  const lvl = parseInt(p.level, 10) > 0 ? p.level : null;
+  // Stat verisi (K/D) arka planda çekilir; gelene kadar stat alanı tamamen boş kalır.
+  const statsReady = p.kd != null;
 
   const trackerUrl = "https://tracker.gg/valorant/profile/riot/" + encodeURIComponent(full) + "/overview";
   const vtlUrl = "https://vtl.lol/id/" + encodeURIComponent(puuid);
@@ -301,7 +356,7 @@ function playerRowHTML(puuid, p, isSelf) {
   <div class="player${isSelf ? " self" : ""}${edgeClass}"${edgeColor && !isSelf ? ` style="--pc:${edgeColor}"` : ""}>
     ${avatar}
     <div class="pmain">
-      <div class="nmeta" data-copy="${esc(full)}" data-puuid="${esc(puuid)}">
+      <div class="nmeta" data-copy="${esc(full === HIDDEN_NAME ? puuid : full)}" data-puuid="${esc(puuid)}">
         <span class="nick">${esc(name)}</span><span class="tag">${esc(tag)}</span>
       </div>
       <div class="rankline">
@@ -310,9 +365,7 @@ function playerRowHTML(puuid, p, isSelf) {
       </div>
     </div>
     <div class="stats">
-      ${bothHidden ? chip(T().hidden, "tracker") : (chip(kd, "K/D", kdCls) + chip(hs, "HS"))}
-      ${chip(lvl, "level")}
-      ${peakChip(p)}
+      ${statsReady ? chip(kdRaw, "K/D", kdCls, T().statsNote) + chip(hsRaw, "HS", "", T().statsNote) + chip(lvl, "level") + peakChip(p) : ""}
     </div>
     <div class="acts">
       <a href="${trackerUrl}" target="_blank" rel="noopener" title="Tracker">TRK</a>
@@ -325,7 +378,7 @@ function playerRowHTML(puuid, p, isSelf) {
 function teamCardHTML(title, cls, players, selfPuuid) {
   const rows = players.map(([puuid, p]) => playerRowHTML(puuid, p, puuid === selfPuuid)).join("");
   return `<div class="team-card ${cls}">
-    <div class="team-head"><span class="team-title">${esc(title)}</span><span class="team-count">${players.length} ${esc(T().players)}</span></div>
+    <div class="team-head"><span class="team-title">${esc(title)}</span><span class="team-count"><span class="team-note">${esc(T().statsNote)}</span>${players.length} ${esc(T().players)}</span></div>
     ${rows}
   </div>`;
 }
@@ -385,7 +438,7 @@ function openSkins(puuid) {
     <div class="wpn-cat pc-cat">
       <div class="wpn-cat-title">${esc(T().playerCard)}</div>
       <div class="pc-card">
-        ${p.level != null ? `<div class="pc-level">${esc(p.level)}</div>` : ""}
+        ${parseInt(p.level, 10) > 0 ? `<div class="pc-level">${esc(p.level)}</div>` : ""}
         ${cardArt ? `<img class="pc-art" src="${esc(cardArt)}" alt="" onerror="this.style.display='none'">` : `<div class="pc-art pc-empty"></div>`}
         <div class="pc-pname">${esc(name)}</div>
       </div>
@@ -583,6 +636,7 @@ function initLangSwitch() {
   showLanInfo();
   // /data poll'u dış siteye (valorant-api.com) giden loadAssets()'i BEKLEMEZ;
   // o istek yavaş/erişilemez olsa bile panel canlı maç verisini hemen gösterir.
+  loadAssetCache();
   poll();
   setInterval(poll, 1500);
   loadAssets();

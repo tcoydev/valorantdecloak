@@ -1,11 +1,16 @@
-import re
 import time
-from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
 # Gizli/streamer-mode isim çözümü için Henrik API anahtarı.
 HENRIK_API_KEY = ""
+
+# config.json'daki örnek değer; gerçek bir anahtar olmadığı için "anahtar yok" sayılır.
+HENRIK_KEY_PLACEHOLDER = "YOUR_APIKEY"
+
+# Çözülemeyen gizli oyuncuların panelde görünen adı. Panel bu isimde tıklanınca
+# oyuncunun puuid'ini kopyalar (web/app.js), o yüzden iki tarafta aynı olmalı.
+HIDDEN_NAME = "Gizli"
 
 # Bir puuid çözülemediğinde, bir sonraki denemeye kadar beklenecek süre (saniye).
 # Henrik API free-tier anahtarları dakikada ~30 istekle sınırlı; heartbeat her
@@ -13,6 +18,10 @@ HENRIK_API_KEY = ""
 # tick'te tekrar denemek limiti hızla doldurup sürekli "Gizli" göstermeye yol
 # açar. Bu cooldown, aynı puuid için istekleri seyreltir.
 RETRY_COOLDOWN_SECONDS = 30
+
+# Başarılı Henrik hesap sorgusu (isim + level) bu süre boyunca önbellekten verilir.
+# Level yavaş değiştiği için uzun tutulur; istek sayısı ve rate limit azalır.
+ACCOUNT_CACHE_TTL_SECONDS = 60 * 60
 
 
 class Names:
@@ -23,6 +32,8 @@ class Names:
         self.cfg = cfg
         # Gizli/streamer-mode isim çözümü tamamen yerelde yapılır.
         self._name_cache = {}
+        # puuid -> (Henrik hesap verisi, geçerlilik sonu (time.monotonic()))
+        self._account_cache = {}
         # puuid -> bir sonraki deneme izinli olduğu zaman (time.monotonic())
         self._retry_after = {}
 
@@ -31,17 +42,33 @@ class Names:
             return ""
         return f"{player_data.get('GameName', '')}#{player_data.get('TagLine', '')}"
 
-    # --- Gizli/streamer-mode isim çözümü: yerelde Henrik API + vtl.lol fallback ---
+    # --- Gizli/streamer-mode isim çözümü: Henrik API ---
 
     def _get_henrik_api_key(self):
-        if HENRIK_API_KEY:
-            return HENRIK_API_KEY
-        return getattr(self.cfg, "henrikdev_api_key", "") or ""
+        key = HENRIK_API_KEY or getattr(self.cfg, "henrikdev_api_key", "") or ""
+        return "" if key == HENRIK_KEY_PLACEHOLDER else key
 
-    def _henrik_resolve(self, puuid):
+    def has_api_key(self):
+        return bool(self._get_henrik_api_key())
+
+    def _henrik_account(self, puuid):
+        """Henrik hesap verisini (name, tag, account_level ...) döner; önbellekli.
+
+        Başarısız denemeden sonra RETRY_COOLDOWN_SECONDS boyunca ağa çıkmadan
+        None döner. Anahtar yoksa da None."""
+        now = time.monotonic()
+        cached = self._account_cache.get(puuid)
+        if cached and now < cached[1]:
+            return cached[0]
+
         api_key = self._get_henrik_api_key()
         if not api_key:
             return None
+
+        retry_after = self._retry_after.get(puuid)
+        if retry_after is not None and now < retry_after:
+            return None
+
         try:
             r = requests.get(
                 f"https://api.henrikdev.xyz/valorant/v1/by-puuid/account/{puuid}",
@@ -49,91 +76,78 @@ class Names:
                 timeout=10,
             )
             if r.status_code == 200:
-                d = r.json().get("data", {})
-                name, tag = d.get("name", ""), d.get("tag", "")
-                if name:
-                    return f"{name}#{tag}" if tag else name
+                data = r.json().get("data") or {}
+                if data:
+                    self._account_cache[puuid] = (data, time.monotonic() + ACCOUNT_CACHE_TTL_SECONDS)
+                    self._retry_after.pop(puuid, None)
+                    return data
+            else:
+                self.log(f"henrik hesap sorgusu hata kodu {r.status_code}: {puuid}")
         except Exception as e:
-            self.log(f"henrik isim cozumu hatasi: {e}")
+            self.log(f"henrik hesap sorgusu hatasi: {e}")
+
+        self._retry_after[puuid] = time.monotonic() + RETRY_COOLDOWN_SECONDS
         return None
 
-    def _vtl_resolve(self, puuid):
-        try:
-            r = requests.get(
-                f"https://vtl.lol/id/{puuid}",
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
-                timeout=10,
-            )
-            if r.status_code == 200:
-                m = re.search(
-                    r'<div[^>]+class=["\'][^"\']*\bcard-title\b[^"\']*["\'][^>]*>([^<]+)</div>',
-                    r.text, flags=re.IGNORECASE | re.DOTALL,
-                )
-                if m and m.group(1).strip():
-                    return m.group(1).strip()
-        except Exception as e:
-            self.log(f"vtl isim cozumu hatasi: {e}")
-        return None
+    @staticmethod
+    def _account_name(account):
+        name, tag = (account or {}).get("name", ""), (account or {}).get("tag", "")
+        if not name:
+            return None
+        return f"{name}#{tag}" if tag else name
+
+    @staticmethod
+    def _account_level(account):
+        level = (account or {}).get("account_level")
+        return level if isinstance(level, int) else None
 
     def _resolve_one(self, puuid):
         if puuid in self._name_cache:
             return self._name_cache[puuid]
 
-        placeholder = f"Gizli ({puuid[:8]})"
-
-        retry_after = self._retry_after.get(puuid)
-        if retry_after is not None and time.monotonic() < retry_after:
-            return placeholder
-
-        name = self._henrik_resolve(puuid) or self._vtl_resolve(puuid)
+        name = self._account_name(self._henrik_account(puuid))
         if name:
             self._name_cache[puuid] = name
-            self._retry_after.pop(puuid, None)
             return name
+        return HIDDEN_NAME
 
-        self._retry_after[puuid] = time.monotonic() + RETRY_COOLDOWN_SECONDS
-        return placeholder
+    # --- Bloklamayan isim çözümü: panel hemen açılsın, gizli isimler sonra gelsin ---
 
-    def _resolve_hidden_names(self, puuids):
-        """Birden çok gizli puuid'i yerelde çözer. Dönüş: {puuid: isim}."""
-        if not puuids:
-            return {}
-        out = {}
-        try:
-            workers = min(10, len(puuids))
-            with ThreadPoolExecutor(max_workers=workers) as ex:
-                for puuid, name in zip(puuids, ex.map(self._resolve_one, puuids)):
-                    out[puuid] = name
-        except Exception as e:
-            self.log(f"yerel isim cozumu hatasi: {e}")
-            for puuid in puuids:
-                out.setdefault(puuid, f"Gizli ({puuid[:8]})")
-        return out
+    @staticmethod
+    def is_placeholder(name):
+        return not name or name == HIDDEN_NAME
 
-    def _resolve_hidden_name(self, puuid):
-        return self._resolve_hidden_names([puuid]).get(puuid, f"Gizli ({puuid[:8]})")
+    def cached_name(self, puuid):
+        """Çözülmüş gizli isim varsa döner, yoksa None (ağ isteği yapmaz)."""
+        return self._name_cache.get(puuid)
 
-    def get_name_from_puuid(self, puuid):
-        try:
-            response = requests.put(
-                self.Requests.pd_url + "/name-service/v2/players",
-                headers=self.Requests.get_headers(),
-                json=[puuid],
-                verify=False,
-                timeout=10
-            )
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list) and len(data) > 0:
-                    name = self._build_name(data[0])
-                    if name and name != "#":
-                        return name
-            return self._resolve_hidden_name(puuid)
-        except Exception as e:
-            self.log(f"Error fetching name from Riot API: {e}")
-            return self._resolve_hidden_name(puuid)
+    def resolve_hidden(self, puuid):
+        """Tek bir gizli puuid'i Henrik API ile çözer; yavaş olabilir, bu
+        yüzden arka plan thread'inden çağrılmalı. Çözülemezse placeholder döner."""
+        return self._resolve_one(puuid)
 
-    def get_multiple_names_from_puuid(self, puuids):
+    def cached_level(self, puuid):
+        """Henrik'ten çekilmiş hesap leveli varsa döner, yoksa None (ağ isteği yapmaz)."""
+        cached = self._account_cache.get(puuid)
+        if cached and time.monotonic() < cached[1]:
+            return self._account_level(cached[0])
+        return None
+
+    def resolve_level(self, puuid):
+        """Oyuncunun hesap levelini Henrik API ile çeker; yavaş olabilir, bu
+        yüzden arka plan thread'inden çağrılmalı. Alınamazsa None döner."""
+        return self._account_level(self._henrik_account(puuid))
+
+    def get_names_fast(self, players):
+        """Panelin ilk çizimini bekletmemek için isimleri bloklamadan getirir.
+
+        Riot'un name-service çağrısı tek istek (hızlı). Gizli oyuncular için
+        yavaş Henrik çağrısı YAPILMAZ: önbellekte varsa gerçek isim,
+        yoksa `Gizli` placeholder'ı döner; gerçek isim arka planda
+        resolve_hidden() ile çözülüp panele sonradan yazılır.
+        Dönüş: {puuid: isim}."""
+        puuids = [p["Subject"] for p in players]
+        found = {}
         try:
             response = requests.put(
                 self.Requests.pd_url + "/name-service/v2/players",
@@ -142,39 +156,23 @@ class Names:
                 verify=False,
                 timeout=10
             )
-
             if response.status_code == 200:
                 resp_data = response.json()
                 if isinstance(resp_data, list):
-                    # Riot returns entries in arbitrary order, so match each entry to its
-                    # puuid via the "Subject" field instead of relying on list position.
-                    by_subject = {
-                        player.get("Subject"): player
-                        for player in resp_data
-                        if isinstance(player, dict) and player.get("Subject")
-                    }
-                    name_dict = {}
-                    hidden = []
-                    for puuid in puuids:
-                        name = self._build_name(by_subject.get(puuid))
-                        if name and name != "#":
-                            name_dict[puuid] = name
-                        else:
-                            hidden.append(puuid)
-                    # Gizli oyuncuların hepsini tek seferde yerelde çöz.
-                    name_dict.update(self._resolve_hidden_names(hidden))
-                    return name_dict
+                    for player in resp_data:
+                        if isinstance(player, dict) and player.get("Subject"):
+                            name = self._build_name(player)
+                            if name and name != "#":
+                                found[player["Subject"]] = name
         except Exception as e:
             self.log(f"Error fetching names from Riot API: {e}")
 
-        # Fallback: Riot yerel API yanıt vermezse hepsini yerelde çözmeyi dene.
-        return self._resolve_hidden_names(puuids)
-
-    def get_names_from_puuids(self, players):
-        players_puuid = []
-        for player in players:
-            players_puuid.append(player["Subject"])
-        return self.get_multiple_names_from_puuid(players_puuid)
+        return {
+            puuid: found.get(puuid)
+            or self._name_cache.get(puuid)
+            or HIDDEN_NAME
+            for puuid in puuids
+        }
 
     def get_players_puuid(self, Players):
         return [player["Subject"] for player in Players]
