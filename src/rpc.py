@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional
 from pypresence import AioPresence
 from pypresence.exceptions import DiscordNotFound, InvalidID, PipeClosed
 
+from src.constants import gamemode_name
+
 
 # Discord RPC metinleri panelden seçilen dile göre çevrilir (webserver.get_lang).
 RPC_I18N = {
@@ -35,6 +37,9 @@ MODE_I18N = {
     "Kartopu Savaşı": {"tr": "Kartopu Savaşı", "en": "Snowball Fight"},
     "ARAM": {"tr": "ARAM", "en": "All Random"},
     "Yeni Harita": {"tr": "Yeni Harita", "en": "New Map"},
+    "Premier": {"tr": "Premier", "en": "Premier"},
+    "Skirmish": {"tr": "Skirmish", "en": "Skirmish"},
+    "Turnuva": {"tr": "Turnuva", "en": "Tournament"},
     "Özel": {"tr": "Özel", "en": "Custom"},
     "Custom": {"tr": "Özel Oyun", "en": "Custom Game"},
     "Custom Game": {"tr": "Özel Oyun", "en": "Custom Game"},
@@ -373,7 +378,7 @@ class Rpc:
                 agent = agent_name
                 agent_img = agent_name.lower().replace("/", "") if agent_name else None
 
-            gamemode = "Custom Game" if presence.get("provisioningFlow") == "CustomGame" else self.gamemodes.get(presence.get("queueId"))
+            gamemode = "Custom Game" if presence.get("provisioningFlow") == "CustomGame" else gamemode_name(presence.get("queueId"))
             gamemode = self._mode_name(gamemode)
 
             ally = presence.get("partyOwnerMatchScoreAllyTeam")
@@ -412,7 +417,7 @@ class Rpc:
 
             party_string = self._t("open_party") if party_access == "OPEN" else self._t("closed_party")
 
-            gamemode = "Custom Game" if party_state == "CUSTOM_GAME_SETUP" else self.gamemodes.get(presence.get("queueId"))
+            gamemode = "Custom Game" if party_state == "CUSTOM_GAME_SETUP" else gamemode_name(presence.get("queueId"))
             gamemode = self._mode_name(gamemode)
 
             return dict(
@@ -426,7 +431,7 @@ class Rpc:
 
         if session_state == "PREGAME":
             is_custom = presence.get("provisioningFlow") == "CustomGame" or party_state == "CUSTOM_GAME_SETUP"
-            gamemode = "Custom Game" if is_custom else self.gamemodes.get(presence.get("queueId"))
+            gamemode = "Custom Game" if is_custom else gamemode_name(presence.get("queueId"))
             gamemode = self._mode_name(gamemode)
 
             match_map = (match_map or "").lower()

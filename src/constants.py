@@ -1,3 +1,5 @@
+import re
+
 import requests
 from colr import color
 
@@ -19,8 +21,37 @@ gamemodes = {
     "custom": "Özel",
     "snowball": "Kartopu Savaşı",
     "valaram": "ARAM",
+    "premier": "Premier",
+    "skirmish": "Skirmish",
+    "tournamentmode": "Turnuva",
     "": "Custom",
 }
+
+# Bilinen önekler: Riot bu modlara sezon/varyant eki koyabiliyor
+# (örn. "premier-seasonmatch", "skirmish2v2").
+_gamemode_prefixes = (
+    ("premier", "Premier"),
+    ("skirmish", "Skirmish"),
+    ("tournament", "Turnuva"),
+)
+
+
+def gamemode_name(queue_id):
+    """Presence'taki queueId'yi gösterim adına çevirir.
+
+    Tabloda yoksa önce bilinen öneklere bakar; o da yoksa yeni çıkan bir mod
+    demektir ve boş bırakmak yerine queueId'yi okunur hâle getirip döndürür
+    (örn. "new-mode_x" -> "New Mode X"). Böylece yeni modlar güncelleme
+    beklemeden en azından adıyla görünür."""
+    if queue_id is None:
+        return None
+    if queue_id in gamemodes:
+        return gamemodes[queue_id]
+    q = str(queue_id).lower()
+    for prefix, name in _gamemode_prefixes:
+        if q.startswith(prefix):
+            return name
+    return re.sub(r"[-_]+", " ", str(queue_id)).strip().title()
 
 before_ascendant_seasons = [
     "0df5adb9-4dcb-6899-1306-3e9860661dd3",

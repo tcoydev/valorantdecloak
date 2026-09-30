@@ -668,7 +668,7 @@ try:
             ):
                 gamemode = "Custom Game"
             else:
-                gamemode = gamemodes.get(priv_presence["queueId"])
+                gamemode = gamemode_name(priv_presence.get("queueId"))
 
             heartbeat_data = {
                 "time": int(time.time()),

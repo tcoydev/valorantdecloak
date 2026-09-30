@@ -46,11 +46,13 @@ export const I18N = {
       Replication: "Kopya", "Team Deathmatch": "Takımlı Ölüm Maçı",
       "Custom Game": "Özel Oyun", Custom: "Özel Oyun", "New Map": "Yeni Harita",
       "Snowball Fight": "Kartopu Savaşı", "All Random One Site": "ARAM",
+      Premier: "Premier", Skirmish: "Skirmish", Tournament: "Turnuva",
       // Sunucudan gelen Türkçe ham değerler (constants.py gamemodes)
       "Dereceli": "Dereceli", "Derecesiz": "Derecesiz", "Tam Gaz": "Tam Gaz",
       "Spike'a Hücum": "Spike'a Hücum", "Ölüm Maçı": "Ölüm Maçı", "Tırmanış": "Tırmanış",
       "Kopya": "Kopya", "Takımlı Ölüm Maçı": "Takımlı Ölüm Maçı", "Özel": "Özel",
       "Kartopu Savaşı": "Kartopu Savaşı", "ARAM": "ARAM", "Yeni Harita": "Yeni Harita",
+      Turnuva: "Turnuva",
     },
     ranks: [
       "Unranked", "Unranked", "Unranked",
@@ -113,11 +115,13 @@ export const I18N = {
       Replication: "Replication", "Team Deathmatch": "Team Deathmatch",
       "Custom Game": "Custom Game", Custom: "Custom Game", "New Map": "New Map",
       "Snowball Fight": "Snowball Fight", "All Random One Site": "All Random",
+      Premier: "Premier", Skirmish: "Skirmish", Tournament: "Tournament",
       // Raw Turkish values sent by the server (constants.py gamemodes)
       "Dereceli": "Competitive", "Derecesiz": "Unrated", "Tam Gaz": "Swift Play",
       "Spike'a Hücum": "Spike Rush", "Ölüm Maçı": "Deathmatch", "Tırmanış": "Escalation",
       "Kopya": "Replication", "Takımlı Ölüm Maçı": "Team Deathmatch", "Özel": "Custom Game",
       "Kartopu Savaşı": "Snowball Fight", "ARAM": "All Random", "Yeni Harita": "New Map",
+      Turnuva: "Tournament",
     },
     ranks: [
       "Unranked", "Unranked", "Unranked",
