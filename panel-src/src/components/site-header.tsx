@@ -1,4 +1,4 @@
-import { Crosshair, X } from "lucide-react"
+import { X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
@@ -20,9 +20,7 @@ export function SiteHeader({ statusText, live, onQuit }: Props) {
     <header className="sticky top-0 z-20 border-b bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
         <div className="flex items-center gap-2.5">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
-            <Crosshair className="size-4" />
-          </div>
+          <img src={import.meta.env.BASE_URL + "logo.png"} alt="" className="size-8 shrink-0" />
           <span className="text-sm font-bold tracking-[0.18em]">
             VALORANT <span className="text-primary">DECLOAK</span>
           </span>
