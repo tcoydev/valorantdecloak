@@ -70,7 +70,7 @@ Clicking "Skins" on a player opens their in-match loadout:
 ### Bundled Release:
 
 1) Download [Microsoft Visual C++ Libraries](https://github.com/abbodi1406/vcredist/releases)
-2) Download the [release](https://github.com/tcoyemre/valorantdecloak/releases/latest).
+2) Download the [release](https://github.com/tcoydev/valorantdecloak/releases/latest).
 3) Extract **all** files.
 4) Optionally, put your own HenrikDEV API key in `config.json`.
 5) Run `Decloak.exe`.
@@ -78,7 +78,7 @@ Clicking "Skins" on a player opens their in-match loadout:
 ### Running from source:
 
 1) Download Python [3.11](https://www.python.org/downloads/release/python-3119/) or [3.10](https://www.python.org/downloads/release/python-31011/), make sure it is added to the PATH. (This is an option on installation.)
-2) Download the [source](https://github.com/tcoyemre/valorantdecloak/archive/refs/heads/main.zip).
+2) Download the [source](https://github.com/tcoydev/valorantdecloak/archive/refs/heads/main.zip).
 3) Run **`INSTALL.bat`** file (or use `pip install -r requirements.txt` in the terminal)
 4) Run **`START.bat`** file (or use `python main.py` in the terminal)
 
@@ -141,7 +141,6 @@ Join the my discord:
 
 - [Valorant-API.com](https://valorant-api.com/)
 - [HenrikDEV](https://henrikdev.xyz/)
-- [HenrikDEV API KEY](https://api.henrikdev.xyz/dashboard/api-keys/)
 
 ## Disclaimer
 
@@ -154,5 +153,5 @@ You acknowledge that the risk of using this software is entirely your own.
 [discord-url]: https://discord.gg/jbknGqMrN9
 [discord-banner]: https://discordapp.com/api/guilds/1464955156180242434/widget.png?style=banner2
 
-[downloads-shield]: https://img.shields.io/github/downloads/tcoyemre/valorantdecloak/total?style=for-the-badge&logo=github
-[downloads-url]: https://github.com/tcoyemre/valorantdecloak/releases/latest
+[downloads-shield]: https://img.shields.io/github/downloads/tcoydev/valorantdecloak/total?style=for-the-badge&logo=github
+[downloads-url]: https://github.com/tcoydev/valorantdecloak/releases/latest
