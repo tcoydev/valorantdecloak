@@ -18,9 +18,6 @@ env/
 .vscode/
 .idea/
 
-# Claude Code project instructions (local only)
-CLAUDE.md
-
 # Runtime / local config
 logs/
 *.log
